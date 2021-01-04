@@ -84,14 +84,23 @@ Resources:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-A
   NatEipB:
     Type: AWS::EC2::EIP
     Properties:
-      Domain: vpc    
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-B  
   NatEipC:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-C
 
 ## Nat Gateway
   NatGatewayA:
@@ -146,7 +155,7 @@ Resources:
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref PublicRouteTableA
 
-# PublicB
+# # PublicB
   PublicRouteTableB:
     Type: AWS::EC2::RouteTable
     Properties: 
@@ -200,10 +209,11 @@ Resources:
       RouteTableId: !Ref PrivateRouteTableA
       SubnetId: !Ref PrivateSubnetA
   PrivateRouteA:
+    # DependsOn: NatGatewayA
     Type: AWS::EC2::Route
     Properties: 
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref NatGatewayA
+      NatGatewayId: !Ref NatGatewayA
       RouteTableId: !Ref PrivateRouteTableA
 
 # PrivateB
@@ -220,10 +230,11 @@ Resources:
       RouteTableId: !Ref PrivateRouteTableB
       SubnetId: !Ref PrivateSubnetB
   PrivateRouteB:
+    DependsOn: NatGatewayB
     Type: AWS::EC2::Route
     Properties: 
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref NatGatewayA
+      NatGatewayId: !Ref NatGatewayB
       RouteTableId: !Ref PrivateRouteTableB
 
 # PrivateC
@@ -243,5 +254,54 @@ Resources:
     Type: AWS::EC2::Route
     Properties: 
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref NatGatewayC
+      NatGatewayId: !Ref NatGatewayC
       RouteTableId: !Ref PrivateRouteTableC
+
+## Network AL
+
+  NetworkAclPublic:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: MainVPC-nacl-public
+
+  SubnetNetworkAclAssociationPublicA:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      NetworkAclId: !Ref NetworkAclPublic
+  SubnetNetworkAclAssociationPublicB:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      NetworkAclId: !Ref NetworkAclPublic
+  SubnetNetworkAclAssociationPublicC:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      NetworkAclId: !Ref NetworkAclPublic
+
+  NetworkAclEntryInPublicAllowHTTP:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPublic
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 80
+        To: 80
+      
+  NetworkAclEntryOutPublicAllowAll:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPublic
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
