@@ -4,15 +4,18 @@ aws cloudformation stack for my home studies
 
 ## Validate
 
- aws cloudformation validate-template --template-body file://infrastructure.yml --profil anteverse
+```bash
+aws cloudformation validate-template --template-body file://infrastructure.yml --profil anteverse
 {
     "Parameters": [],
     "Description": "AWS CloudFormation VPC Template"
 }
+```
 
 ## Creation
 
-aws cloudformation create-stack \                                                              ✔ 
+```bash
+aws cloudformation create-stack \
 --stack-name anteverse \
 --template-body file://init.yml \
 --parameters ParameterKey=S3BucketUrl,ParameterValue=https://anteverse-stack.s3.amazonaws.com \
@@ -23,10 +26,12 @@ aws cloudformation create-stack \                                               
 {
     "StackId": "arn:aws:cloudformation:eu-west-3:590095079366:stack/anteverse/6f9da270-7613-11eb-8858-065c9f0d2482"
 }
+```
 
 ## Update
 
-aws cloudformation update-stack \                                                              ✔ 
+```bash
+aws cloudformation update-stack \
 --stack-name anteverse \
 --template-body file://init.yml \
 --parameters ParameterKey=S3BucketUrl,ParameterValue=https://anteverse-stack.s3.amazonaws.com \
@@ -37,17 +42,23 @@ aws cloudformation update-stack \                                               
 {
     "StackId": "arn:aws:cloudformation:eu-west-3:590095079366:stack/anteverse/6f9da270-7613-11eb-8858-065c9f0d2482"
 }
+```
 
 ## Delete
 
+```bash
 aws cloudformation delete-stack --stack-name anteverse --profil anteverse
+```
 
 ## Monitor progress
 
+```bash
 aws cloudformation wait stack-create-complete --stack-name Anteverse --profil anteverse
+```
 
 ## Show outputs
 
+```bash
 aws cloudformation describe-stacks  --profil anteverse                                                                                                                  {
     "Stacks": [
         {
@@ -66,9 +77,11 @@ aws cloudformation describe-stacks  --profil anteverse                          
         }
     ]
 }
+```
 
 ## Lists stack
 
+```bash
 aws cloudformation list-stacks --profil anteverse
 {
     "StackSummaries": [
@@ -85,3 +98,4 @@ aws cloudformation list-stacks --profil anteverse
         },
         ....
 }
+```
