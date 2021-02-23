@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  CloudFormation template to create a lambda function to restore a DB instance to a specific time.
+Resources:
+  RDSestoreLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import boto3
+          import cfnresponse
+          from datetime import datetime
+          from time import sleep
+
+
+          def lambda_handler(event, context):
+              responseData = {}
+
+              if event['RequestType'] == 'Delete':
+                  responseData['Data'] = 'Delete Operation is not supported'
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "None")
+
+              try:
+                  Source_DB_Instance_Identifier = event['ResourceProperties']['SourceDBInstanceIdentifier']
+                  Renamed_DB_Instance_Identifier = event['ResourceProperties']['RenamedDBInstanceIdentifier']
+                  Target_DB_Instance_Identifier = event['ResourceProperties']['TargetDBInstanceIdentifier']
+                  db_subnet_group_name = event['ResourceProperties']['dbsubnetgroupname']
+                  year = int(event['ResourceProperties']['Year'])
+                  month = int(event['ResourceProperties']['Month'])
+                  day = int(event['ResourceProperties']['Day'])
+                  hour = int(event['ResourceProperties']['Hour'])
+                  minute = int(event['ResourceProperties']['Minute'])
+                  second = int(event['ResourceProperties']['Second'])
+
+                  rdsclient = boto3.client('rds')
+
+                  # Rename existing instance
+                  # check if renaming is needed
+                  if Renamed_DB_Instance_Identifier == 'DoNotRename':
+                      print('you have selected not to rename the existing DB instance')
+                  else:
+                      rdsclient.modify_db_instance(
+                          DBInstanceIdentifier=Source_DB_Instance_Identifier,
+                          NewDBInstanceIdentifier=Renamed_DB_Instance_Identifier,
+                          ApplyImmediately=True
+                      )
+                      Source_DB_Instance_Identifier = Renamed_DB_Instance_Identifier
+
+                  sleep(60)
+
+                  while True:
+                      try:
+                          response = rdsclient.describe_db_instances(
+                              DBInstanceIdentifier=Source_DB_Instance_Identifier
+                          )
+                          if response['DBInstances'][0]['DBInstanceStatus'] == 'available':
+                              print('your RDS instance is available')
+                              break
+                      except Exception as e:
+                          print(e)
+                          print('the {} instanance is rebooting'.format(Renamed_DB_Instance_Identifier))
+                          sleep(10)
+
+                  # point in time recovery starting here
+
+                  rdsclient.restore_db_instance_to_point_in_time(
+                      SourceDBInstanceIdentifier=Source_DB_Instance_Identifier,
+                      TargetDBInstanceIdentifier=Target_DB_Instance_Identifier,
+                      DBSubnetGroupName=db_subnet_group_name,
+                      RestoreTime=datetime(year, month, day, hour, minute, second)
+                  )
+                  responseData['Data'] = 'Operation has been completed successfully'
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "None")
+
+              except Exception as e:
+                  print('Exception: ' + str(e))
+                  responseData['Data'] = str(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, responseData, "None")
+
+
+      Description: Sample RDS Point in time recovery function
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt:
+        - RDSRestoreLambdaFunctionExecutionRole
+        - Arn
+      Runtime: python3.8
+      Timeout: 600
+    
+    
+  RDSRestoreLambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      Path: "/"
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: arn:aws:logs:*:*:*
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: "s3.*" 
+          - Action:
+              - rds:RestoreDBInstanceToPointInTime
+              - rds:RestoreDBClusterToPointInTime
+              - rds:ModifyDBInstance
+              - rds:DescribeDBInstances
+            Effect: Allow
+            Resource: "*"  
+          Version: '2012-10-17'
+        PolicyName: PointInTimeRestoreLambdaFunctionExecutionRolePolicy
+    
+
+Outputs:
+  oPointInTimeRestoreLambda:
+    Value:
+      Fn::GetAtt: rPointInTimeRestoreLambda.Arn
+    Export:
+      Name: rds-epointimerestorelambda-arn

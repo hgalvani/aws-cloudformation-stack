@@ -1,0 +1,224 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  AWS CloudFormation VPC Template
+
+Parameters:
+
+  S3BucketUrl:
+    Description: "S3 Bucket Url"
+    Type: "String"
+
+  VpcCidrBlock:
+    Description: "Server Environment name."
+    Type: "String"
+    Default: "10.0.0.0/16"
+
+  MyPublicIP:
+    Description: "public ip address"
+    Type: "String"
+    Default: ''
+
+  MyEMailAddress:
+    Description: "e-mail address"
+    Type: "String"
+    Default: ''  
+
+Resources:
+
+  MiscSNS:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/misc/sns.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"
+        EMailAddress:
+          Ref: MyEMailAddress
+
+  InfraVPC:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/infra/vpc.yml"
+      TimeoutInMinutes: '5'
+      Parameters:
+        VpcCidrBlock:
+          Ref: "VpcCidrBlock"
+        PublicIP:
+          Ref: "MyPublicIP"
+        StackName:
+          Ref: "AWS::StackName"  
+
+###  WEB Platform ###
+
+  WebMedia:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/web/s3_media.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"     
+
+  WebBDD:
+    DependsOn:
+      - InfraVPC
+      - MiscSNS
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/web/rds.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"
+        VpcId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.VpcId
+        PrivateSubnetAId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetAId
+        PrivateSubnetBId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetBId
+        PrivateSubnetCId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetCId
+        SecurityGroupRDSMySQLAzAId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupRDSMySQLAzAId
+        SecurityGroupRDSMySQLAzBId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupRDSMySQLAzBId
+        SecurityGroupRDSMySQLAzCId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupRDSMySQLAzCId
+        RDSSNSTopic: 
+          Fn::GetAtt: 
+          - MiscSNS
+          - Outputs.RDSSNSTopic  
+
+  # WebFileStorage:
+  #   DependsOn:
+  #     - InfraVPC
+  #   Type: "AWS::CloudFormation::Stack"
+  #   Properties:
+  #     TemplateURL:
+  #       Fn::Sub: "${S3BucketUrl}/web/efs.yml"
+  #     Parameters:
+  #       StackName:
+  #         Ref: "AWS::StackName"
+  #       VpcId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.VpcId
+  #       PrivateSubnetAId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.PrivateSubnetAId
+  #       PrivateSubnetBId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.PrivateSubnetBId
+  #       PrivateSubnetCId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.PrivateSubnetCId
+  #       SecurityGroupEFSNFSAzAId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.SecurityGroupEFSNFSAzAId
+  #       SecurityGroupEFSNFSAzBId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.SecurityGroupEFSNFSAzBId
+  #       SecurityGroupEFSNFSAzCId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.SecurityGroupEFSNFSAzCId         
+
+  WebServerFront:
+    DependsOn:
+      - InfraVPC
+      - MiscSNS
+      - WebMedia
+      - WebBDD
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/web/asg.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"
+        VpcId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.VpcId
+        PublicSubnetAId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PublicSubnetAId
+        PublicSubnetBId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PublicSubnetBId
+        PublicSubnetCId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PublicSubnetCId
+        SecurityGroupWebServerSSHId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupWebServerSSHId
+        SecurityGroupWebServerHTTPId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupWebServerHTTPId
+        EC2SNSTopic: 
+          Fn::GetAtt: 
+          - MiscSNS
+          - Outputs.EC2SNSTopic
+        IAMSecretsARN: 
+          Fn::GetAtt: 
+          - WebMedia
+          - Outputs.IAMSecretsARN
+        PublicIP:
+          Ref: "MyPublicIP"
+        DBInstanceEndpoint: 
+          Fn::GetAtt: 
+          - WebBDD
+          - Outputs.DBInstanceEndpoint
+        DBInstanceReplicaEndpoint: 
+          Fn::GetAtt: 
+          - WebBDD
+          - Outputs.DBInstanceReplicaEndpoint
+
+###  Intranet Platform ###
+
+  # IntranetWebServer:
+  #   DependsOn:
+  #     - InfraVPC  
+  #   Type: "AWS::CloudFormation::Stack"
+  #   Properties:
+  #     TemplateURL:
+  #       Fn::Sub: "${S3BucketUrl}/intranet/ec2_web.yml"
+
+  # IntranetVPNServer:
+  #   DependsOn:
+  #     - InfraVPC  
+  #   Type: "AWS::CloudFormation::Stack"
+  #   Properties:
+  #     TemplateURL:
+  #       Fn::Sub: "${S3BucketUrl}/intranet/ec2_vpn.yml"
+
+
+        

@@ -1,0 +1,65 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  AWS CloudFormation SecurityGroup Template
+
+Parameters:
+
+  VpcId:
+    Description: "VPC ID"
+    Type: "String"
+    Default: vpc-xxxxx
+
+Resources:
+
+### SecurityGroup ###
+
+  SecurityGroupWebServerHTTP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP
+      GroupName: SecurityGroupWebServerHTTP
+      VpcId:
+        Fn::ImportValue: VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-webserver-http'
+
+  SecurityGroupRDSMySQL:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MySQL
+      GroupName: SecurityGroupRDSMySQL
+      VpcId:
+        Fn::ImportValue: VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-rds-mysql'  
+
+Outputs: 
+
+  SecurityGroupWebServerHTTPId:
+    Description: The security group ID to use for public web servers
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupWebServerHTTP
+      - GroupId
+    Export:
+      Name: SecurityGroupWebServerHTTPId

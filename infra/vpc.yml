@@ -1,0 +1,934 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  AWS CloudFormation VPC Template
+
+Parameters:
+
+  VpcCidrBlock:
+    Description: "Server Environment name."
+    Type: "String"
+    Default: "10.0.0.0/16"
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String"
+
+  PublicIP:
+    Description: "My Own Public IP"
+    Type: "String"
+    Default: '0.0.0.0/0'
+
+Resources:
+
+### VPC ###
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock:
+        Ref: VpcCidrBlock
+      Tags:
+        - Key: Name
+          Value: 'MainVPC'
+
+### Subnets ###
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.0.0/19
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-private-a'
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '1'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.32.0/19
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-private-b'
+
+
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '2'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.64.0/19
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-private-c'
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.128.0/20
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-public-a'
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '1'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.144.0/20
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-public-b'
+
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC    
+      AvailabilityZone:
+        Fn::Select:
+          - '2'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      CidrBlock: 10.0.160.0/20
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-public-c'
+
+
+### Internet Gateway ###
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value: 'MainVPC-InternetGateway'
+
+  AttachInternetGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+
+### Elastic IP ###
+
+  NatEipA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-A
+
+  NatEipB:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-B
+
+  NatEipC:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MainVPC-EIP-C
+
+### Nat Gateway ##
+
+  NatGatewayA:
+    DependsOn: AttachInternetGateway
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt: NatEipA.AllocationId
+      SubnetId:
+        Ref: PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: MainVPC-nat-a
+
+  NatGatewayB:
+    DependsOn: AttachInternetGateway
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt: NatEipB.AllocationId
+      SubnetId:
+        Ref: PublicSubnetB
+      Tags:
+        - Key: Name
+          Value: MainVPC-nat-b
+
+  NatGatewayC:
+    DependsOn: AttachInternetGateway
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt: NatEipC.AllocationId
+      SubnetId:
+        Ref: PublicSubnetC
+      Tags:
+        - Key: Name
+          Value: MainVPC-nat-c
+
+### Route tables ###
+
+# PublicA #
+  PublicRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-public-a
+
+  AttachPublicRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableA
+      SubnetId:
+        Ref: PublicSubnetA
+
+  PublicRouteA:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+      RouteTableId:
+        Ref: PublicRouteTableA
+
+# PublicB #
+  PublicRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-public-b
+
+  AttachPublicRouteTableB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableB
+      SubnetId:
+        Ref: PublicSubnetB
+
+  PublicRouteB:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+      RouteTableId:
+        Ref: PublicRouteTableB
+
+# PublicC #
+  PublicRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-public-c
+
+  AttachPublicRouteTableC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableC
+      SubnetId:
+        Ref: PublicSubnetC
+
+  PublicRouteC:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+      RouteTableId:
+        Ref: PublicRouteTableC
+
+# PrivateA #
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-private-a
+
+  AttachPrivateRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      SubnetId:
+        Ref: PrivateSubnetA
+
+  PrivateRouteA:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayA
+      RouteTableId:
+        Ref: PrivateRouteTableA
+
+# PrivateB #
+  PrivateRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-private-b
+
+  AttachPrivateRouteTableB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      SubnetId:
+        Ref: PrivateSubnetB
+
+  PrivateRouteB:
+    DependsOn: NatGatewayB
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayB
+      RouteTableId:
+        Ref: PrivateRouteTableB
+
+# PrivateC #
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value: MainVPC-route-private-c
+
+  AttachPrivateRouteTableC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      SubnetId:
+        Ref: PrivateSubnetC
+
+  PrivateRouteC:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayC
+      RouteTableId:
+        Ref: PrivateRouteTableC
+
+### Public Network ACL ###
+
+  NetworkAclPublic:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: 
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: MainVPC-nacl-public
+
+  SubnetNetworkAclAssociationPublicA:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+        Ref: PublicSubnetA
+      NetworkAclId:
+        Ref: NetworkAclPublic
+
+  SubnetNetworkAclAssociationPublicB:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+        Ref: PublicSubnetB
+      NetworkAclId:
+        Ref: NetworkAclPublic
+
+  SubnetNetworkAclAssociationPublicC:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+        Ref: PublicSubnetC
+      NetworkAclId:
+        Ref: NetworkAclPublic
+
+  NetworkAclEntryInPublicAllowHTTP:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 80
+        To: 80
+
+  NetworkAclEntryInPublicAllowSSH:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock:
+        Fn::Join:
+          - ''
+          - - Ref: PublicIP
+            - '/32'
+      PortRange:
+        From: 22
+        To: 22
+
+  NetworkAclEntryInPublicAllowResponses:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 1024
+        To: 65535     
+      
+  NetworkAclEntryOutPublicAllowHTTP:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 80
+        To: 80
+
+  NetworkAclEntryOutPublicAllowHTTPS:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 443
+        To: 443
+  
+  NetworkAclEntryOutPublicAllowMySQLToPrivateA:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.0.0/19
+      PortRange:
+        From: 3306
+        To: 3306
+  
+  NetworkAclEntryOutPublicAllowMySQLToPrivateB:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 130
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.32.0/19
+      PortRange:
+        From: 3306
+        To: 3306
+  
+  NetworkAclEntryOutPublicAllowMySQLToPrivateC:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 140
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.64.0/19
+      PortRange:
+        From: 3306
+        To: 3306
+
+  NetworkAclEntryOutPublicAllowResponses:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 150
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
+      PortRange:
+        From: 32768
+        To: 65535 
+
+###  Private Network NACL ###
+
+  NetworkAclPrivate:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: MainVPC-nacl-private
+
+  SubnetNetworkAclAssociationPrivateA:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnetA
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+
+  SubnetNetworkAclAssociationPrivateB:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnetB
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+
+  SubnetNetworkAclAssociationPrivateC:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId:
+       Ref: PrivateSubnetC
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+
+  NetworkAclEntryInPrivateAllowMySQLFromPublicSubnetA:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.128.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+
+  NetworkAclEntryInPrivateAllowMySQLFromPublicSubnetB:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.144.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+
+  NetworkAclEntryInPrivateAllowMySQLFromPublicSubnetC:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.160.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+      
+  NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetA:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.128.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+  
+  NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetB:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.144.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+
+  NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetC:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.160.0/20
+      PortRange:
+        From: 3306
+        To: 3306
+
+  ### SecurityGroup ###
+
+  SecurityGroupWebServerHTTP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP
+      GroupName: SecurityGroupWebServerHTTP
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-webserver-http'
+
+  SecurityGroupWebServerSSH:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH
+      GroupName: SecurityGroupWebServerSSH
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp:
+          Fn::Join:
+            - ''
+            - - Ref: PublicIP
+              - '/32'
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-webserver-ssh'        
+
+  SecurityGroupRDSMySQLAzA:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MySQL
+      GroupName: SecurityGroupRDSMySQLAzA
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 10.0.0.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-rds-mysql-aza'  
+
+  SecurityGroupRDSMySQLAzB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MySQL
+      GroupName: SecurityGroupRDSMySQLAzB
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 10.0.32.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-rds-mysql-azb'
+
+  SecurityGroupRDSMySQLAzC:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MySQL
+      GroupName: SecurityGroupRDSMySQLAzC
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        CidrIp: 10.0.64.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-rds-mysql-azc'
+
+### SG for EFS/NFS ###
+
+  SecurityGroupEFSNFSAzA:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow NFS
+      GroupName: SecurityGroupEFSNFSAzA
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2049'
+        ToPort: '2049'
+        CidrIp: 10.0.0.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-efs-nfs-aza'
+
+  SecurityGroupEFSNFSAzB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow NFS
+      GroupName: SecurityGroupEFSNFSAzB
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2049'
+        ToPort: '2049'
+        CidrIp: 10.0.32.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-efs-nfs-azb'
+
+  SecurityGroupEFSNFSAzC:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow NFS
+      GroupName: SecurityGroupEFSNFSAzC
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2049'
+        ToPort: '2049'
+        CidrIp: 10.0.64.0/19
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'sg-efs-nfs-azc'  
+    
+Outputs: 
+
+  VpcId: 
+    Description: "VPC Id"
+    Value: 
+      Ref: VPC
+    Export:
+      Name: VpcId
+  
+  PrivateSubnetAId:
+    Description: The subnet ID of PrivateSubnetA
+    Value:
+      Ref: PrivateSubnetA
+    Export:
+      Name: PrivateSubnetAId
+
+  PrivateSubnetBId:
+    Description: The subnet ID of PrivateSubnetB
+    Value:
+      Ref: PrivateSubnetB
+    Export:
+      Name: PrivateSubnetBId
+
+  PrivateSubnetCId:
+    Description: The subnet ID of PrivateSubnetC
+    Value:
+      Ref: PrivateSubnetC
+    Export:
+      Name: PrivateSubnetCId
+
+  PublicSubnetAId:
+    Description: The subnet ID of PublicSubnetA
+    Value:
+      Ref: PublicSubnetA
+    Export:
+      Name: PublicSubnetAId
+
+  PublicSubnetBId:
+    Description: The subnet ID of PublicSubnetB
+    Value:
+      Ref: PublicSubnetB
+    Export:
+      Name: PublicSubnetBId
+
+  PublicSubnetCId:
+    Description: The subnet ID of PublicSubnetC
+    Value:
+      Ref: PublicSubnetC
+    Export:
+      Name: PublicSubnetCId
+
+  SecurityGroupWebServerHTTPId:
+    Description: The security group ID to use for public web servers
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupWebServerHTTP
+      - GroupId
+    Export:
+      Name: SecurityGroupWebServerHTTPId
+
+  SecurityGroupWebServerSSHId:
+    Description: The security group ID to use for public web servers
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupWebServerSSH
+      - GroupId
+    Export:
+      Name: SecurityGroupWebServerSSHId    
+
+  SecurityGroupRDSMySQLAzAId:
+    Description: The security group ID to use for RDS for AzA
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupRDSMySQLAzA
+      - GroupId
+    Export:
+      Name: SecurityGroupRDSMySQLAzAId
+
+  SecurityGroupRDSMySQLAzBId:
+    Description: The security group ID to use for RDS for AzB
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupRDSMySQLAzB
+      - GroupId
+    Export:
+      Name: SecurityGroupRDSMySQLAzBId
+
+  SecurityGroupRDSMySQLAzCId:
+    Description: The security group ID to use for RDS for AzC
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupRDSMySQLAzC
+      - GroupId
+    Export:
+      Name: SecurityGroupRDSMySQLAzCId
+
+  SecurityGroupEFSNFSAzAId:
+    Description: The security group ID to use for EFS for AzA
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupEFSNFSAzA
+      - GroupId
+    Export:
+      Name: SecurityGroupEFSNFSAzAId
+
+  SecurityGroupEFSNFSAzBId:
+    Description: The security group ID to use for EFS for AzB
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupEFSNFSAzB
+      - GroupId
+    Export:
+      Name: SecurityGroupEFSNFSAzBId
+
+  SecurityGroupEFSNFSAzCId:
+    Description: The security group ID to use for EFS for AzC
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupEFSNFSAzC
+      - GroupId
+    Export:
+      Name: SecurityGroupEFSNFSAzCId

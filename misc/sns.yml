@@ -1,0 +1,50 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  AWS CloudFormation SNS Template
+
+
+Parameters:
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String"
+
+  EMailAddress:
+    Description: "Mail Address"
+    Type: "String"
+    Default: ''
+
+Resources:
+
+  RDSSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: "${StackName}-rds-sns-topic"
+
+  EC2SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: "${StackName}-ec2-sns-topic"
+
+  EC2Subscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint:
+        Ref: EMailAddress
+      Protocol: email
+      TopicArn:
+        Ref: 'EC2SNSTopic'
+
+Outputs:
+
+  RDSSNSTopic:
+    Value:
+      Ref: RDSSNSTopic
+  
+  EC2SNSTopic:
+    Value:
+      Ref: EC2SNSTopic

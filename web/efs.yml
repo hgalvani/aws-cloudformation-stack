@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+    AWS CloudFormation EFS Template
+
+Parameters:
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String"
+
+  VpcId:
+    Description: "VPC ID"
+    Type: "String"
+
+  PrivateSubnetAId:
+    Description: The subnet ID of PrivateSubnetA
+    Type: "String"
+
+  PrivateSubnetBId:
+    Description: The subnet ID of PrivateSubnetB
+    Type: "String"
+
+  PrivateSubnetCId:
+    Description: The subnet ID of PrivateSubnetC
+    Type: "String"
+
+  SecurityGroupEFSNFSAzAId:
+    Description: "The security group ID to use for EFS for AzA"
+    Type: "String"
+
+  SecurityGroupEFSNFSAzBId:
+    Description: "The security group ID to use for EFS for AzB"
+    Type: "String"
+
+  SecurityGroupEFSNFSAzCId:
+    Description: "The security group ID to use for EFS for AzC"
+    Type: "String"   
+
+Resources:
+  
+  FileSystemResource:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      PerformanceMode: generalPurpose
+      Encrypted: false
+      # LifecyclePolicies:
+      #   - TransitionToIA: AFTER_30_DAYS
+      FileSystemTags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${StackName}-SharedFileSystem"
+      # FileSystemPolicy:
+      #   Version: "2012-10-17"
+      #   Statement:
+      #     - Effect: "Allow"
+      #       Action:
+      #         - "elasticfilesystem:ClientMount"
+      #       Principal:'arn:aws:iam::111122223333:root'
+
+  MountTargetResourceAzA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: PrivateSubnetAId
+      SecurityGroups:
+      - Ref: SecurityGroupEFSNFSAzAId
+
+  MountTargetResourceAzB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: PrivateSubnetBId
+      SecurityGroups:
+      - Ref: SecurityGroupEFSNFSAzBId
+
+  MountTargetResourceAzC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: PrivateSubnetCId
+      SecurityGroups:
+      - Ref: SecurityGroupEFSNFSAzCId
+ 
+  AccessPointResource:
+    Type: 'AWS::EFS::AccessPoint'
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      PosixUser:
+        Uid: "13234"
+        Gid: "1322"
+        SecondaryGids:
+          - "1344"
+          - "1452"
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "708798"
+          OwnerUid: "7987987"
+          Permissions: "0755"
+        Path: "/testcfn/abc"
+
+Outputs:
+

@@ -1,0 +1,228 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+    AWS CloudFormation RDS Template
+
+Parameters:
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String"
+
+  VpcId:
+    Description: "VPC ID"
+    Type: "String"
+
+  DBInstanceType:
+    AllowedValues:
+      - db.t3.small
+      - db.t3.micro
+    ConstraintDescription: Must be a valid RDS instance class.
+    Default: "db.t3.micro"
+    Description: The Amazon RDS database instance class.
+    Type: String
+  
+  DBMasterUsername:
+    AllowedPattern: ^([a-zA-Z0-9]*)$
+    Description: The Amazon RDS master username.
+    ConstraintDescription: Must contain only alphanumeric characters and be at least 8 characters.
+    MaxLength: 16
+    MinLength: 1
+    Default: "admin"
+    Type: String
+  
+  DBAllocatedStorage:
+    Default: '5'
+    Description: The size of the database (GiB)
+    Type: Number
+  
+  DBName:
+    AllowedPattern: ^([a-zA-Z0-9]*)$
+    Description: The Amazon RDS master database name.
+    Default : 'anteverse'
+    Type: String
+    
+  PrivateSubnetAId:
+    Description: The subnet ID of PrivateSubnetA
+    Type: "String"
+
+  PrivateSubnetBId:
+    Description: The subnet ID of PrivateSubnetB
+    Type: "String"
+
+  PrivateSubnetCId:
+    Description: The subnet ID of PrivateSubnetC
+    Type: "String"
+
+  SecurityGroupRDSMySQLAzAId:
+    Description: "The security group ID to use for RDS for AzA"
+    Type: "String"
+
+  SecurityGroupRDSMySQLAzBId:
+    Description: "The security group ID to use for RDS for AzB"
+    Type: "String"
+
+  SecurityGroupRDSMySQLAzCId:
+    Description: "The security group ID to use for RDS for AzC"
+    Type: "String"
+
+  RDSSNSTopic:
+    Description: "RDS SNS Topic ARN"
+    Type: "String"   
+
+Resources:
+
+  #     BackupRetentionPeriod:
+  #     PreferredBackupWindow:
+
+  # DB
+  DBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBInstanceIdentifier:
+        Fn::Sub: "${StackName}-db"
+      DBName:
+        Ref: DBName
+      DBInstanceClass:
+        Ref: DBInstanceType
+      AllocatedStorage:
+        Ref: DBAllocatedStorage
+      Engine: MySQL
+      EngineVersion: 5.7.31
+      MasterUsername:
+        Fn::Join:
+          - ''
+          - - '{{resolve:secretsmanager:'
+            - Ref: DBSecrets
+            - ':SecretString:username}}'
+      MasterUserPassword:
+        Fn::Join:
+          - ''
+          - - '{{resolve:secretsmanager:'
+            - Ref: DBSecrets
+            - ':SecretString:password}}'
+      DBSubnetGroupName:
+        Ref: DBSubnetGroup
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VPCSecurityGroups:
+      - Ref: SecurityGroupRDSMySQLAzAId
+      - Ref: SecurityGroupRDSMySQLAzBId
+      - Ref: SecurityGroupRDSMySQLAzCId
+      #BackupRetentionPeriod: '0'
+
+  # DB Replica
+  # DBInstanceReplica:
+  #   Type: AWS::RDS::DBInstance
+  #   Properties:
+  #     DBInstanceIdentifier:
+  #       Fn::Sub: "${StackName}-db-replica"
+  #     SourceDBInstanceIdentifier:
+  #       Ref: DBInstance
+  #     DBInstanceClass:
+  #       Ref: DBInstanceType
+  #     VPCSecurityGroups:
+  #     - Ref: SecurityGroupRDSMySQLAzAId
+  #     - Ref: SecurityGroupRDSMySQLAzBId
+  #     - Ref: SecurityGroupRDSMySQLAzCId
+  #     AvailabilityZone:
+  #       Fn::Select:
+  #         - '1'
+  #         - Fn::GetAZs: {Ref: 'AWS::Region'}  
+  #     AllocatedStorage:
+  #       Ref: DBAllocatedStorage
+      
+  # Database subnet group for the RDS instance 
+  DBSubnetGroup: 
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: "DB Subnet Group"
+      SubnetIds: 
+        - Ref: PrivateSubnetAId
+        - Ref: PrivateSubnetBId
+        - Ref: PrivateSubnetCId    
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${StackName}-db-subnet-group"
+
+  #This is a Secret resource with a randomly generated password in its SecretString JSON.
+  DBSecrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: RDSSecrets
+      Description: "This is a Secrets Manager secret for an RDS DB instance"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: "password"
+        PasswordLength: 10
+        ExcludeCharacters: '"@/\'
+      Tags:
+        -
+          Key: AppName
+          Value:
+            Fn::Sub: "${StackName}-app"
+
+  #This is a SecretTargetAttachment resource which updates the referenced Secret resource with properties about
+  #the referenced RDS instance
+  SecretRDSInstanceAttachment:
+    Type: "AWS::SecretsManager::SecretTargetAttachment"
+    Properties:
+      TargetType: AWS::RDS::DBInstance
+      SecretId:
+        Ref: DBSecrets
+      TargetId:
+        Ref: DBInstance
+
+  ### App RDS Secrets ###
+  AppDBSecrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: AppDBSecrets
+      Description: "This is a Secrets Manager secret for an App RDS DB instance"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "anteverse"}'
+        GenerateStringKey: "password"
+        PasswordLength: 10
+        ExcludeCharacters: '"@/\'
+      Tags:
+        -
+          Key: AppName
+          Value:
+            Fn::Sub: "${StackName}-app"
+
+  RDSEventSubscription:
+    Type: AWS::RDS::EventSubscription
+    Properties: 
+      Enabled: true
+      EventCategories: 
+        - creation
+      SnsTopicArn:
+        Ref: 'RDSSNSTopic'
+      SourceIds:
+        - Ref: DBInstance
+      SourceType: db-instance 
+                  
+
+Outputs:
+
+  DBInstanceEndpoint:
+    Description: "DB Instance Endpoint"
+    Value:
+      Fn::GetAtt:
+      - DBInstance
+      - Endpoint.Address
+    Export:
+      Name: DBInstanceEndpoint
+
+  DBInstanceReplicaEndpoint:
+    Description: "DB Instance Replica Endpoint"
+    Value:
+      Fn::GetAtt:
+      - DBInstanceReplica
+      - Endpoint.Address
+    Export:
+      Name: DBInstanceReplicaEndpoint  

@@ -1,33 +1,53 @@
 # aws-cloudformation-stack
-aws cloudformation stack
 
-# Validate
+aws cloudformation stack for my home studies
+
+## Validate
+
  aws cloudformation validate-template --template-body file://infrastructure.yml --profil anteverse
 {
     "Parameters": [],
     "Description": "AWS CloudFormation VPC Template"
 }
 
-# Creation 
-aws cloudformation create-stack --stack-name Anteverse --template-body file://infrastructure.yml --profil anteverse
+## Creation
+
+aws cloudformation create-stack \                                                              ✔ 
+--stack-name anteverse \
+--template-body file://init.yml \
+--parameters ParameterKey=S3BucketUrl,ParameterValue=https://anteverse-stack.s3.amazonaws.com \
+  ParameterKey=MyEMailAddress,ParameterValue=youremailexample.com\
+  ParameterKey=MyPublicIP,ParameterValue=1.2.3.4  \
+--capabilities CAPABILITY_NAMED_IAM \
+--profil default
 {
-    "StackId": "arn:aws:cloudformation:eu-west-3:666:stack/Anteverse/dfb07dc0-4c5c-11eb-a31f-0a881ea86c00"
+    "StackId": "arn:aws:cloudformation:eu-west-3:590095079366:stack/anteverse/6f9da270-7613-11eb-8858-065c9f0d2482"
 }
 
-# Update
-aws cloudformation update-stack --stack-name Anteverse --template-body file://infrastructure.yml --profil anteverse                                                     
+## Update
+
+aws cloudformation update-stack \                                                              ✔ 
+--stack-name anteverse \
+--template-body file://init.yml \
+--parameters ParameterKey=S3BucketUrl,ParameterValue=https://anteverse-stack.s3.amazonaws.com \
+  ParameterKey=MyEMailAddress,ParameterValue=youremailexample.com \
+  ParameterKey=MyPublicIP,ParameterValue=1.2.3.4 \
+--capabilities CAPABILITY_NAMED_IAM \
+--profil default
 {
-    "StackId": "arn:aws:cloudformation:eu-west-3:666:stack/Anteverse/c1d25870-4c73-11eb-b58b-06ca742260fc"
+    "StackId": "arn:aws:cloudformation:eu-west-3:590095079366:stack/anteverse/6f9da270-7613-11eb-8858-065c9f0d2482"
 }
 
-# Delete
-aws cloudformation delete-stack --stack-name Anteverse --profil anteverse
+## Delete
 
-# Monitor progress
+aws cloudformation delete-stack --stack-name anteverse --profil anteverse
+
+## Monitor progress
+
 aws cloudformation wait stack-create-complete --stack-name Anteverse --profil anteverse
 
+## Show outputs
 
-# Show outputs
 aws cloudformation describe-stacks  --profil anteverse                                                                                                                  {
     "Stacks": [
         {
@@ -47,7 +67,8 @@ aws cloudformation describe-stacks  --profil anteverse                          
     ]
 }
 
-# Lists stack
+## Lists stack
+
 aws cloudformation list-stacks --profil anteverse
 {
     "StackSummaries": [
@@ -63,4 +84,4 @@ aws cloudformation list-stacks --profil anteverse
             }
         },
         ....
-}        
+}

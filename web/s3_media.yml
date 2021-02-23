@@ -1,0 +1,89 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+    AWS CloudFormation S3 Template
+
+Parameters:
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String" 
+
+Resources:
+
+### Bucket S3 ###
+  S3Media:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: "Private"
+      BucketName:
+        Fn::Sub: "${StackName}-media"
+
+### S3 IAM User and policy ###    
+  S3MediaUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName:
+        Fn::Sub: "${StackName}-media-user"
+      Policies:
+        - PolicyName: AllowWordpressMediaAcces
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
+              - 's3:ListBucket'
+              - 's3:DeleteObject'
+              - 's3:PutObjectAcl'
+              - 's3:GetObjectAcl'
+              Resource:
+                -  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: S3Media
+                -  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: S3Media
+                      - /*    
+
+### S3 IAM User AccessKey ###
+  S3MediaUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName:
+        Ref: S3MediaUser
+
+### S3 IAM User Secrets storage ###
+  IAMSecrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name:
+        Fn::Sub: '${StackName}-iam-secret'
+      Description: Store Iam UserAccessKey and SecretAccessKey
+      SecretString:
+        Fn::Join:
+          - ''
+          - - '{"aws_access_key_id":"'
+            - Ref: S3MediaUserAccessKey
+            - '","aws_secret_access_key":"'
+            - Fn::GetAtt: S3MediaUserAccessKey.SecretAccessKey
+            - '"}'
+      Tags:
+        -
+          Key: AppName
+          Value:
+            Fn::Sub: "${StackName}-app"
+
+Outputs:
+
+  IAMSecretsARN:
+    Description: Secrets ARN
+    Value:
+      Ref: IAMSecrets
+    Export:
+      Name: IAMSecretsARN
