@@ -77,7 +77,11 @@ Parameters:
   
   DBInstanceReplicaEndpoint:
     Description: "DBInstance Replica Endpoint"
-    Type: "String"  
+    Type: "String"
+
+  FileSystemResourceId:
+    Description: "The File System Resource Id"
+    Type: "String"   
 
 Resources:
 
@@ -95,26 +99,50 @@ Resources:
             Action: 
               - "sts:AssumeRole"
       Path: "/"
-  
-  WebSiteRolePolicies: 
-    Type: "AWS::IAM::Policy"
-    Properties: 
-      PolicyName: "root"
-      PolicyDocument: 
-        Version: "2012-10-17"
-        Statement: 
-          - 
-            Effect: "Allow"
-            Action:
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
             - 'secretsmanager:GetSecretValue'
             - 'secretsmanager:GetSecretValue'
             - 'secretsmanager:DescribeSecret'
             - 'secretsmanager:ListSecretVersionIds'
+            Effect: Allow
             Resource:
               - Ref: IAMSecretsARN
-      Roles: 
-        - 
-          Ref: "WebSiteInstanceRole"
+          # - Action:
+          #     - s3:GetObject
+          #   Effect: Allow
+          #   Resource:
+          #     Ref : BucketBackup
+          # - Action:
+          #     - rds:RestoreDBInstanceToPointInTime
+          #     - rds:RestoreDBClusterToPointInTime
+          #     - rds:ModifyDBInstance
+          #     - rds:DescribeDBInstances
+          #   Effect: Allow
+          #   Resource: "*"  
+          Version: '2012-10-17'
+  
+  # WebSiteRolePolicies: 
+  #   Type: "AWS::IAM::Policy"
+  #   Properties: 
+  #     PolicyName: "root"
+  #     PolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement: 
+  #         - 
+  #           Effect: "Allow"
+  #           Action:
+  #           - 'secretsmanager:GetSecretValue'
+  #           - 'secretsmanager:GetSecretValue'
+  #           - 'secretsmanager:DescribeSecret'
+  #           - 'secretsmanager:ListSecretVersionIds'
+  #           Resource:
+  #             - Ref: IAMSecretsARN
+  #     Roles: 
+  #       - 
+  #         Ref: "WebSiteInstanceRole"
 
   WebSiteInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
@@ -154,20 +182,22 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           export DOCKER_DIR="docker-nginx-wordpress-mysql"
-          cd /home/admin/
-          sudo git clone https://github.com/hgalvani/docker-nginx-wordpress-mysql.git
+          # file-system-id.efs.aws-region.amazonaws.com 
+          # $ sudo mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport file-system-DNS-name:/ ~/efs-mount-point 
+          echo "${FileSystemResourceId}:/ /mnt/efs efs _netdev,noresvport,tls,iam 0 0" | sudo tee -a  /etc/fstab
+          sudo git clone https://github.com/hgalvani/docker-nginx-wordpress-mysql.git /home/admin/docker-nginx-wordpress-mysql
           echo "PROJECT_NAME=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "MYSQL_HOST=${DBInstanceEndpoint}" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "MYSQL_PORT=3306" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "MYSQL_DBNAME=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_USER=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_PASSWORD=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
+          echo "MYSQL_USER=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."username")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
+          echo "MYSQL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."password")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "NGINX_PORT=80" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "NGINX_ALLOWED_IP_FOR_ADMIN=${PublicIP}" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "AWS_ACCESS_KEY_ID=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_access_key_id")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
           echo "AWS_SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_secret_access_key")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          cd /home/admin/docker-nginx-wordpress-mysql/prod/
-          /usr/local/bin/docker-compose up -d
+          /usr/local/bin/docker-compose -f /home/admin/docker-nginx-wordpress-mysql/prod/docker-compose.yml up -d 
+          
 
           
           
@@ -290,6 +320,21 @@ Resources:
           TargetGroupArn:
             Ref: WebsiteTargetGroup
 
+
+  # Route53RecordSet:
+  #   Condition: AddDNSRecord
+  #   Type: 'AWS::Route53::RecordSet'
+  #   Properties:
+  #     Type: A
+  #     Name: !Ref DomainName
+  #     AliasTarget:
+  #       HostedZoneId: !GetAtt 
+  #         - ApplicationLoadBalancer
+  #         - CanonicalHostedZoneID
+  #       DNSName: !GetAtt 
+  #         - ApplicationLoadBalancer
+  #         - DNSName
+  #     HostedZoneId: !Ref HostedZoneID
 
 # Outputs:
 #   AutoScalingGroup:

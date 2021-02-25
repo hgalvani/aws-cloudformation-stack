@@ -115,7 +115,8 @@ Resources:
           - Action:
               - s3:GetObject
             Effect: Allow
-            Resource: "s3.*" 
+            Resource:
+              Ref : BucketBackup
           - Action:
               - rds:RestoreDBInstanceToPointInTime
               - rds:RestoreDBClusterToPointInTime

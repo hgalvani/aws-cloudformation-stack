@@ -107,44 +107,44 @@ Resources:
           - MiscSNS
           - Outputs.RDSSNSTopic  
 
-  # WebFileStorage:
-  #   DependsOn:
-  #     - InfraVPC
-  #   Type: "AWS::CloudFormation::Stack"
-  #   Properties:
-  #     TemplateURL:
-  #       Fn::Sub: "${S3BucketUrl}/web/efs.yml"
-  #     Parameters:
-  #       StackName:
-  #         Ref: "AWS::StackName"
-  #       VpcId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.VpcId
-  #       PrivateSubnetAId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.PrivateSubnetAId
-  #       PrivateSubnetBId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.PrivateSubnetBId
-  #       PrivateSubnetCId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.PrivateSubnetCId
-  #       SecurityGroupEFSNFSAzAId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.SecurityGroupEFSNFSAzAId
-  #       SecurityGroupEFSNFSAzBId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.SecurityGroupEFSNFSAzBId
-  #       SecurityGroupEFSNFSAzCId: 
-  #         Fn::GetAtt: 
-  #         - InfraVPC
-  #         - Outputs.SecurityGroupEFSNFSAzCId         
+  WebFileStorage:
+    DependsOn:
+      - InfraVPC
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/web/efs.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"
+        VpcId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.VpcId
+        PrivateSubnetAId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetAId
+        PrivateSubnetBId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetBId
+        PrivateSubnetCId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.PrivateSubnetCId
+        SecurityGroupEFSNFSAzAId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupEFSNFSAzAId
+        SecurityGroupEFSNFSAzBId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupEFSNFSAzBId
+        SecurityGroupEFSNFSAzCId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.SecurityGroupEFSNFSAzCId         
 
   WebServerFront:
     DependsOn:
@@ -201,6 +201,10 @@ Resources:
           Fn::GetAtt: 
           - WebBDD
           - Outputs.DBInstanceReplicaEndpoint
+        FileSystemResourceId: 
+          Fn::GetAtt: 
+          - WebFileStorage
+          - Outputs.FileSystemResourceId
 
 ###  Intranet Platform ###
 

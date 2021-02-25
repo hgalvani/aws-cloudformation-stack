@@ -218,11 +218,11 @@ Outputs:
     Export:
       Name: DBInstanceEndpoint
 
-  DBInstanceReplicaEndpoint:
-    Description: "DB Instance Replica Endpoint"
-    Value:
-      Fn::GetAtt:
-      - DBInstanceReplica
-      - Endpoint.Address
-    Export:
-      Name: DBInstanceReplicaEndpoint  
+  # DBInstanceReplicaEndpoint:
+  #   Description: "DB Instance Replica Endpoint"
+  #   Value:
+  #     Fn::GetAtt:
+  #     - DBInstanceReplica
+  #     - Endpoint.Address
+  #   Export:
+  #     Name: DBInstanceReplicaEndpoint  
