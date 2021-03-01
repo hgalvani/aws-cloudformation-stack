@@ -42,23 +42,11 @@ Resources:
   FileSystemResource:
     Type: 'AWS::EFS::FileSystem'
     Properties:
-      BackupPolicy:
-        Status: ENABLED
       PerformanceMode: generalPurpose
-      Encrypted: false
-      # LifecyclePolicies:
-      #   - TransitionToIA: AFTER_30_DAYS
       FileSystemTags:
         - Key: Name
           Value:
             Fn::Sub: "${StackName}-SharedFileSystem"
-      # FileSystemPolicy:
-      #   Version: "2012-10-17"
-      #   Statement:
-      #     - Effect: "Allow"
-      #       Action:
-      #         - "elasticfilesystem:ClientMount"
-      #       Principal:'arn:aws:iam::111122223333:root'
 
   MountTargetResourceAzA:
     Type: AWS::EFS::MountTarget
@@ -70,46 +58,69 @@ Resources:
       SecurityGroups:
       - Ref: SecurityGroupEFSNFSAzAId
 
-  # MountTargetResourceAzB:
-  #   Type: AWS::EFS::MountTarget
-  #   Properties:
-  #     FileSystemId:
-  #       Ref: FileSystemResource
-  #     SubnetId:
-  #       Ref: PrivateSubnetBId
-  #     SecurityGroups:
-  #     - Ref: SecurityGroupEFSNFSAzBId
+  MountTargetResourceAzB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: PrivateSubnetBId
+      SecurityGroups:
+      - Ref: SecurityGroupEFSNFSAzBId
 
-  # MountTargetResourceAzC:
-  #   Type: AWS::EFS::MountTarget
-  #   Properties:
-  #     FileSystemId:
-  #       Ref: FileSystemResource
-  #     SubnetId:
-  #       Ref: PrivateSubnetCId
-  #     SecurityGroups:
-  #     - Ref: SecurityGroupEFSNFSAzCId
+  MountTargetResourceAzC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: PrivateSubnetCId
+      SecurityGroups:
+      - Ref: SecurityGroupEFSNFSAzCId
  
   # AccessPointResource:
   #   Type: 'AWS::EFS::AccessPoint'
   #   Properties:
   #     FileSystemId:
   #       Ref: FileSystemResource
-  #     PosixUser:
-  #       Uid: "13234"
-  #       Gid: "1322"
-  #       SecondaryGids:
-  #         - "1344"
-  #         - "1452"
+  #     # PosixUser:
+  #     #   Uid: "33"
+  #     #   Gid: "33"
+  #     #   SecondaryGids:
+  #     #     - "101"
+  #     #     - "102"
   #     RootDirectory:
-  #       CreationInfo:
-  #         OwnerGid: "708798"
-  #         OwnerUid: "7987987"
-  #         Permissions: "0755"
-  #       Path: "/testcfn/abc"
+  #       # CreationInfo:
+  #       #   OwnerGid: "708798"
+  #       #   OwnerUid: "7987987"
+  #       #   Permissions: "0755"
+  #       Path:
+  #         Fn::Sub: "/app/${StackName}"
+  #     AccessPointTags:
+  #         -
+  #           Key: Name
+  #           Value:
+  #             Fn::Sub: "${StackName}-efs-accesspoint"    
 
 Outputs:
 
   FileSystemResourceId:
     Value:
       Ref: FileSystemResource
+    Export:
+      Name: FileSystemResourceId
+
+  # AccessPointResourceId:
+  #   Value:
+  #     Ref: AccessPointResource
+  #   Export:
+  #     Name: AccessPointResourceId
+
+  # AccessPointResourceARN:
+  #   Value:
+  #     Fn::GetAtt:
+  #     - AccessPointResource
+  #     - Arn
+  #   Export:
+  #     Name: AccessPointResourceARN
+            

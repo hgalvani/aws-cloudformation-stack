@@ -1,0 +1,46 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  AWS CloudFormation Route53 Template
+
+
+Parameters:
+
+  StackName:
+    Description: "Stack Name"
+    Type: "String"
+
+  VpcId:
+    Description: "VPC ID"
+    Type: "String"
+
+Resources:
+
+  DNSZone: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'Hosted zone for anteverse'
+      Name:
+        Fn::Sub: "${StackName}.local"
+      VPCs: 
+        - 
+          VPCId:
+            Ref: VpcId
+          VPCRegion: 'AWS::Region'
+      # HostedZoneTags: 
+      #   - 
+      #     Key: 'Name'
+      #     Value:
+      #       Fn::Sub: "${StackName}-dns-zone"
+        
+# Outputs:
+
+  # RDSSNSTopic:
+  #   Value:
+  #     Ref: RDSSNSTopic
+  
+  # EC2SNSTopic:
+  #   Value:
+  #     Ref: EC2SNSTopic

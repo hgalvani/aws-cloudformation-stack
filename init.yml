@@ -37,7 +37,7 @@ Resources:
           Ref: "AWS::StackName"
         EMailAddress:
           Ref: MyEMailAddress
-
+          
   InfraVPC:
     Type: "AWS::CloudFormation::Stack"
     Properties:
@@ -50,7 +50,20 @@ Resources:
         PublicIP:
           Ref: "MyPublicIP"
         StackName:
-          Ref: "AWS::StackName"  
+          Ref: "AWS::StackName"
+
+  MiscRoute53:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${S3BucketUrl}/misc/route53.yml"
+      Parameters:
+        StackName:
+          Ref: "AWS::StackName"
+        VpcId: 
+          Fn::GetAtt: 
+          - InfraVPC
+          - Outputs.VpcId        
 
 ###  WEB Platform ###
 
@@ -61,7 +74,7 @@ Resources:
         Fn::Sub: "${S3BucketUrl}/web/s3_media.yml"
       Parameters:
         StackName:
-          Ref: "AWS::StackName"     
+          Ref: "AWS::StackName"
 
   WebBDD:
     DependsOn:
@@ -105,7 +118,7 @@ Resources:
         RDSSNSTopic: 
           Fn::GetAtt: 
           - MiscSNS
-          - Outputs.RDSSNSTopic  
+          - Outputs.RDSSNSTopic
 
   WebFileStorage:
     DependsOn:
@@ -152,6 +165,7 @@ Resources:
       - MiscSNS
       - WebMedia
       - WebBDD
+      - WebFileStorage
     Type: "AWS::CloudFormation::Stack"
     Properties:
       TemplateURL:
@@ -191,20 +205,30 @@ Resources:
           Fn::GetAtt: 
           - WebMedia
           - Outputs.IAMSecretsARN
+        AppDBSecretsARN: 
+          Fn::GetAtt: 
+          - WebBDD
+          - Outputs.AppDBSecretsARN  
         PublicIP:
           Ref: "MyPublicIP"
         DBInstanceEndpoint: 
           Fn::GetAtt: 
           - WebBDD
           - Outputs.DBInstanceEndpoint
-        DBInstanceReplicaEndpoint: 
-          Fn::GetAtt: 
-          - WebBDD
-          - Outputs.DBInstanceReplicaEndpoint
         FileSystemResourceId: 
           Fn::GetAtt: 
           - WebFileStorage
           - Outputs.FileSystemResourceId
+
+
+        # AccessPointResourceId: 
+        #   Fn::GetAtt: 
+        #   - WebFileStorage
+        #   - Outputs.AccessPointResourceId  
+        # AccessPointResourceARN: 
+        #   Fn::GetAtt: 
+        #   - WebFileStorage
+        #   - Outputs.AccessPointResourceARN 
 
 ###  Intranet Platform ###
 

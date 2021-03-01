@@ -28,6 +28,8 @@ Resources:
     Properties:
       CidrBlock:
         Ref: VpcCidrBlock
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'  
       Tags:
         - Key: Name
           Value: 'MainVPC'
@@ -517,6 +519,48 @@ Resources:
         From: 3306
         To: 3306
 
+  NetworkAclEntryOutPublicAllowNFSToPrivateA:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 142
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.0.0/19
+      PortRange:
+        From: 2049
+        To: 2049
+  
+  NetworkAclEntryOutPublicAllowNFSToPrivateB:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 144
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.32.0/19
+      PortRange:
+        From: 2049
+        To: 2049
+  
+  NetworkAclEntryOutPublicAllowNFSToPrivateC:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPublic
+      RuleNumber: 146
+      Protocol: 6
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 10.0.64.0/19
+      PortRange:
+        From: 2049
+        To: 2049
+
   NetworkAclEntryOutPublicAllowResponses:
     Type: 'AWS::EC2::NetworkAclEntry'
     Properties:
@@ -607,6 +651,48 @@ Resources:
       PortRange:
         From: 3306
         To: 3306
+
+  NetworkAclEntryInPrivateAllowNFSFromPublicSubnetA:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 130
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.128.0/20
+      PortRange:
+        From: 2049
+        To: 2049
+
+  NetworkAclEntryInPrivateAllowNFSFromPublicSubnetB:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 140
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.144.0/20
+      PortRange:
+        From: 2049
+        To: 2049
+
+  NetworkAclEntryInPrivateAllowNFSFromPublicSubnetC:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId:
+        Ref: NetworkAclPrivate
+      RuleNumber: 150
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.0.160.0/20
+      PortRange:
+        From: 2049
+        To: 2049      
       
   NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetA:
     Type: 'AWS::EC2::NetworkAclEntry'
@@ -614,41 +700,10 @@ Resources:
       NetworkAclId:
         Ref: NetworkAclPrivate
       RuleNumber: 100
-      Protocol: 6
+      Protocol: -1
       RuleAction: allow
       Egress: true
-      CidrBlock: 10.0.128.0/20
-      PortRange:
-        From: 3306
-        To: 3306
-  
-  NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetB:
-    Type: 'AWS::EC2::NetworkAclEntry'
-    Properties:
-      NetworkAclId:
-        Ref: NetworkAclPrivate
-      RuleNumber: 110
-      Protocol: 6
-      RuleAction: allow
-      Egress: true
-      CidrBlock: 10.0.144.0/20
-      PortRange:
-        From: 3306
-        To: 3306
-
-  NetworkAclEntryOutPrivateAllowMySQLToPublicSubnetC:
-    Type: 'AWS::EC2::NetworkAclEntry'
-    Properties:
-      NetworkAclId:
-        Ref: NetworkAclPrivate
-      RuleNumber: 120
-      Protocol: 6
-      RuleAction: allow
-      Egress: true
-      CidrBlock: 10.0.160.0/20
-      PortRange:
-        From: 3306
-        To: 3306
+      CidrBlock: 10.0.0.0/16
 
   ### SecurityGroup ###
 
@@ -705,10 +760,10 @@ Resources:
       - IpProtocol: tcp
         FromPort: '3306'
         ToPort: '3306'
-        CidrIp: 10.0.0.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId 
       Tags:
         - Key: Name
           Value: 'sg-rds-mysql-aza'  
@@ -724,10 +779,10 @@ Resources:
       - IpProtocol: tcp
         FromPort: '3306'
         ToPort: '3306'
-        CidrIp: 10.0.32.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId 
       Tags:
         - Key: Name
           Value: 'sg-rds-mysql-azb'
@@ -743,10 +798,10 @@ Resources:
       - IpProtocol: tcp
         FromPort: '3306'
         ToPort: '3306'
-        CidrIp: 10.0.64.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId
       Tags:
         - Key: Name
           Value: 'sg-rds-mysql-azc'
@@ -756,7 +811,7 @@ Resources:
   SecurityGroupEFSNFSAzA:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow NFS
+      GroupDescription: Allow EFS/NFS
       GroupName: SecurityGroupEFSNFSAzA
       VpcId:
         Ref: VPC
@@ -764,10 +819,10 @@ Resources:
       - IpProtocol: tcp
         FromPort: '2049'
         ToPort: '2049'
-        CidrIp: 10.0.0.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId 
       Tags:
         - Key: Name
           Value: 'sg-efs-nfs-aza'
@@ -783,10 +838,10 @@ Resources:
       - IpProtocol: tcp
         FromPort: '2049'
         ToPort: '2049'
-        CidrIp: 10.0.32.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId
       Tags:
         - Key: Name
           Value: 'sg-efs-nfs-azb'
@@ -802,14 +857,14 @@ Resources:
       - IpProtocol: tcp
         FromPort: '2049'
         ToPort: '2049'
-        CidrIp: 10.0.64.0/19
-      SecurityGroupEgress:
-      - IpProtocol: -1
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupWebServerHTTP
+          - GroupId
       Tags:
         - Key: Name
-          Value: 'sg-efs-nfs-azc'  
-    
+          Value: 'sg-efs-nfs-azc'
+
 Outputs: 
 
   VpcId: 

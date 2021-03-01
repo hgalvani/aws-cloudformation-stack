@@ -79,6 +79,7 @@ Resources:
   # DB
   DBInstance:
     Type: 'AWS::RDS::DBInstance'
+    DeletionPolicy: Delete
     Properties:
       DBInstanceIdentifier:
         Fn::Sub: "${StackName}-db"
@@ -159,7 +160,7 @@ Resources:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: "password"
         PasswordLength: 10
-        ExcludeCharacters: '"@/\'
+        ExcludeCharacters: '"@/\|%.'
       Tags:
         -
           Key: AppName
@@ -187,7 +188,7 @@ Resources:
         SecretStringTemplate: '{"username": "anteverse"}'
         GenerateStringKey: "password"
         PasswordLength: 10
-        ExcludeCharacters: '"@/\'
+        ExcludeCharacters: '"@/\|%.'
       Tags:
         -
           Key: AppName
@@ -205,6 +206,18 @@ Resources:
       SourceIds:
         - Ref: DBInstance
       SourceType: db-instance 
+
+  # myDNSRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneName: !Ref 'HostedZoneResource'
+  #     Comment: DNS name for my instance.
+  #     Name: !Join ['', [!Ref 'Ec2Instance', ., !Ref 'AWS::Region', ., !Ref 'HostedZone', .]]
+  #     Type: A
+  #     TTL: '900'
+  #     ResourceRecords:
+  #     - !GetAtt Ec2Instance.PublicIp
+    
                   
 
 Outputs:
@@ -225,4 +238,12 @@ Outputs:
   #     - DBInstanceReplica
   #     - Endpoint.Address
   #   Export:
-  #     Name: DBInstanceReplicaEndpoint  
+  #     Name: DBInstanceReplicaEndpoint
+
+  AppDBSecretsARN:
+    Description: AppDBSecrets ARN
+    Value:
+      Ref: AppDBSecrets
+    Export:
+      Name: AppDBSecretsARN
+

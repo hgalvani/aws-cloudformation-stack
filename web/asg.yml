@@ -18,7 +18,7 @@ Parameters:
   AmiIdentifier:
     Type: String
     Description: The AMI identifier to deploy.
-    Default: "ami-030f26d9e722e2b3c"
+    Default: "ami-06dc7d6a46770a86d"
 
   InstanceType:
     Type: String
@@ -51,7 +51,16 @@ Parameters:
 
   IAMSecretsARN:
     Description: "IAM Secrets ARN"
+    Type: "String"
+
+  AppDBSecretsARN:
+    Description: "App DB Secrets ARN"
     Type: "String"  
+
+  S3BackupARN:
+    Description: "S3 Backup ARN"
+    Type: "String"
+    Default: "arn:aws:s3:::anteverse-backup"
 
   Toggle:
     Description: "Allow trigger ASG Update"
@@ -61,10 +70,20 @@ Parameters:
       - 'false'
     Default: 'true'
 
-  GithubRepo:
+  GithubRepoUrl:
     Type: String
-    Description: Github Repo.
-    Default: "docker-nginx-wordpress-mysql"
+    Description: Github Repo Url
+    Default: "https://github.com/hgalvani/docker-nginx-wordpress-mysql.git"
+  
+  GithubRepoDir:
+    Type: String
+    Description: Github Repo Dir
+    Default: "/mnt/efs/docker-nginx-wordpress-mysql"
+
+  Env:
+    Type: String
+    Description: Environement
+    Default: "prod"  
 
   PublicIP:
     Description: "My Own Public IP"
@@ -75,13 +94,11 @@ Parameters:
     Description: "DBInstance Endpoint"
     Type: "String"
   
-  DBInstanceReplicaEndpoint:
-    Description: "DBInstance Replica Endpoint"
-    Type: "String"
-
   FileSystemResourceId:
     Description: "The File System Resource Id"
-    Type: "String"   
+    Type: "String"
+
+  
 
 Resources:
 
@@ -99,50 +116,67 @@ Resources:
             Action: 
               - "sts:AssumeRole"
       Path: "/"
-      Policies:
-      - PolicyDocument:
-          Statement:
-          - Action:
-            - 'secretsmanager:GetSecretValue'
+  
+  WebSitePolicyGetSecretsValues: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "GetSecretsValuesPolicy"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Action:
             - 'secretsmanager:GetSecretValue'
             - 'secretsmanager:DescribeSecret'
             - 'secretsmanager:ListSecretVersionIds'
-            Effect: Allow
             Resource:
               - Ref: IAMSecretsARN
-          # - Action:
-          #     - s3:GetObject
-          #   Effect: Allow
-          #   Resource:
-          #     Ref : BucketBackup
-          # - Action:
-          #     - rds:RestoreDBInstanceToPointInTime
-          #     - rds:RestoreDBClusterToPointInTime
-          #     - rds:ModifyDBInstance
-          #     - rds:DescribeDBInstances
-          #   Effect: Allow
-          #   Resource: "*"  
-          Version: '2012-10-17'
-  
-  # WebSiteRolePolicies: 
+              - Ref: AppDBSecretsARN
+      Roles: 
+        - 
+          Ref: "WebSiteInstanceRole"
+          
+
+  WebSitePolicyAccsessS3Backup: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "AccsessS3BackupPolicy"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Action:
+            - 's3:GetObject'
+            - 's3:PutObject'
+            - 's3:ListBucket'
+            - 's3:DeleteObject'
+            - 's3:PutObjectAcl'
+            - 's3:GetObjectAcl'
+            Resource:
+              - Ref: S3BackupARN
+      Roles: 
+        - 
+          Ref: "WebSiteInstanceRole"
+
+  # WebSitePolicyAccsessEFSFileSystem: 
   #   Type: "AWS::IAM::Policy"
   #   Properties: 
-  #     PolicyName: "root"
+  #     PolicyName: "AccsessEFSFileSystemPolicy"
   #     PolicyDocument: 
   #       Version: "2012-10-17"
   #       Statement: 
   #         - 
   #           Effect: "Allow"
   #           Action:
-  #           - 'secretsmanager:GetSecretValue'
-  #           - 'secretsmanager:GetSecretValue'
-  #           - 'secretsmanager:DescribeSecret'
-  #           - 'secretsmanager:ListSecretVersionIds'
+  #           - 'elasticfilesystem:ClientMount'
+  #           - 'elasticfilesystem:ClientWrite'
   #           Resource:
-  #             - Ref: IAMSecretsARN
+  #             - Ref: AccessPointResourceARN
   #     Roles: 
   #       - 
-  #         Ref: "WebSiteInstanceRole"
+  #         Ref: "WebSiteInstanceRole"        
 
   WebSiteInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
@@ -181,27 +215,24 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          export DOCKER_DIR="docker-nginx-wordpress-mysql"
-          # file-system-id.efs.aws-region.amazonaws.com 
-          # $ sudo mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport file-system-DNS-name:/ ~/efs-mount-point 
-          echo "${FileSystemResourceId}:/ /mnt/efs efs _netdev,noresvport,tls,iam 0 0" | sudo tee -a  /etc/fstab
-          sudo git clone https://github.com/hgalvani/docker-nginx-wordpress-mysql.git /home/admin/docker-nginx-wordpress-mysql
-          echo "PROJECT_NAME=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_HOST=${DBInstanceEndpoint}" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_PORT=3306" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_DBNAME=anteverse" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_USER=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."username")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "MYSQL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."password")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "NGINX_PORT=80" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "NGINX_ALLOWED_IP_FOR_ADMIN=${PublicIP}" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "AWS_ACCESS_KEY_ID=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_access_key_id")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          echo "AWS_SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_secret_access_key")" | sudo tee -a /home/admin/docker-nginx-wordpress-mysql/prod/.env
-          /usr/local/bin/docker-compose -f /home/admin/docker-nginx-wordpress-mysql/prod/docker-compose.yml up -d 
+          sudo mkdir -p /mnt/efs
+          sudo mount -t efs -o tls ${FileSystemResourceId}:/ /mnt/efs
+          sudo chmod go+rw /mnt/efs
+          sudo git clone ${GithubRepoUrl} ${GithubRepoDir}
+          sudo mkdir -p ${GithubRepoDir}/${Env}
+          echo "PROJECT_NAME=anteverse" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "MYSQL_HOST=${DBInstanceEndpoint}" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "MYSQL_PORT=3306" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "MYSQL_DBNAME=anteverse" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "MYSQL_USER=$(aws secretsmanager get-secret-value --secret-id AppDBSecrets | jq --raw-output .SecretString | jq -r ."username")" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "MYSQL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id AppDBSecrets| jq --raw-output .SecretString | jq -r ."password")" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "NGINX_PORT=80" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "NGINX_ALLOWED_IP_FOR_ADMIN=${PublicIP}" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "AWS_ACCESS_KEY_ID=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_access_key_id")" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          echo "AWS_SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value --secret-id anteverse-iam-secret | jq --raw-output .SecretString | jq -r ."aws_secret_access_key")" | sudo tee -a ${GithubRepoDir}/${Env}/.env
+          /usr/local/bin/docker-compose -f ${GithubRepoDir}/${Env}/docker-compose.yml up -d 
           
-
-          
-          
-
+    
   WebsiteScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
