@@ -155,7 +155,15 @@ Resources:
             - 's3:PutObjectAcl'
             - 's3:GetObjectAcl'
             Resource:
-              - Ref: S3BackupARN
+                -  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: S3BackupARN
+                -  Fn::Join:
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - Ref: S3BackupARN
+                      - /*  
       Roles: 
         - 
           Ref: "WebSiteInstanceRole"

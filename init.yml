@@ -52,18 +52,18 @@ Resources:
         StackName:
           Ref: "AWS::StackName"
 
-  MiscRoute53:
-    Type: "AWS::CloudFormation::Stack"
-    Properties:
-      TemplateURL:
-        Fn::Sub: "${S3BucketUrl}/misc/route53.yml"
-      Parameters:
-        StackName:
-          Ref: "AWS::StackName"
-        VpcId: 
-          Fn::GetAtt: 
-          - InfraVPC
-          - Outputs.VpcId        
+  # MiscRoute53:
+  #   Type: "AWS::CloudFormation::Stack"
+  #   Properties:
+  #     TemplateURL:
+  #       Fn::Sub: "${S3BucketUrl}/misc/route53.yml"
+  #     Parameters:
+  #       StackName:
+  #         Ref: "AWS::StackName"
+  #       VpcId: 
+  #         Fn::GetAtt: 
+  #         - InfraVPC
+  #         - Outputs.VpcId        
 
 ###  WEB Platform ###
 
